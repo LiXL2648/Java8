@@ -1,6 +1,6 @@
 package com.li.java8.interfact;
 
-public interface MyFunction<T> {
+public interface MyFunction<T, R> {
 
-    T operator(T t);
+    R operator(T ... t);
 }
