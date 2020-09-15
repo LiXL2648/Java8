@@ -15,6 +15,10 @@ public class Employee {
     public Employee() {
     }
 
+    public Employee(String empName) {
+        this.empName = empName;
+    }
+
     public Employee(Integer id, String empName, Integer gender, Integer age, Double salary) {
         this.id = id;
         this.empName = empName;
