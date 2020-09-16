@@ -5,6 +5,7 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -16,9 +17,55 @@ import java.util.stream.Stream;
  */
 public class TestStreamApi {
 
+    List<Employee> list = Arrays.asList(
+            new Employee(1, "LiXL", 1, 18, 8000.00),
+            new Employee(2, "YuCX", 0, 19, 9000.00),
+            new Employee(3, "LinK", 1, 17, 7000.00),
+            new Employee(4, "LinZH", 1, 18, 8000.00),
+            new Employee(5, "LiLX", 0, 16, 9000.00),
+            new Employee(5, "LiLX", 0, 16, 9000.00),
+            new Employee(5, "LiLX", 0, 16, 9000.00)
+    );
+
     // 中间操作
-    public void testStreamApi() {
-        // 1.
+
+    // 1. filter：排除某些元素
+    @Test
+    public void testFilter() {
+        list.stream().filter(e -> e.getGender() == 1)
+                .forEach(System.out::println);
+
+        Iterator<Employee> iterator = list.iterator();
+        while (iterator.hasNext()) {
+            System.out.println(iterator.next());
+        }
+    }
+
+    // 2. distinct：去除重复元素
+    @Test
+    public void testDistinct() {
+        list.stream()
+                .filter(e -> e.getSalary() > 7000)
+                .distinct()
+                .forEach(System.out::println);
+    }
+
+    // 3. limit：截断流，使其元素不超过给定的数量
+    @Test
+    public void testLimit() {
+        list.stream()
+                .filter(e -> e.getSalary() > 7000)
+                .limit(2)
+                .forEach(System.out::println);
+    }
+
+    // 4. skip：扔掉前 n 个元素的流
+    @Test
+    public void testSkip() {
+        list.stream()
+                .filter(e -> e.getSalary() > 7000)
+                .skip(2)
+                .forEach(System.out::println);
     }
 
     // 创建Stream
