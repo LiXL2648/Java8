@@ -14,11 +14,22 @@ public class Employee {
 
     private Double salary;
 
+    private Status status;
+
     public Employee() {
     }
 
     public Employee(String empName) {
         this.empName = empName;
+    }
+
+    public Employee(Integer id, String empName, Integer gender, Integer age, Double salary, Status status) {
+        this.id = id;
+        this.empName = empName;
+        this.gender = gender;
+        this.age = age;
+        this.salary = salary;
+        this.status = status;
     }
 
     public Employee(Integer id, String empName, Integer gender, Integer age, Double salary) {
@@ -69,6 +80,14 @@ public class Employee {
         this.salary = salary;
     }
 
+    public Status getStatus() {
+        return status;
+    }
+
+    public void setStatus(Status status) {
+        this.status = status;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -78,12 +97,13 @@ public class Employee {
                 Objects.equals(empName, employee.empName) &&
                 Objects.equals(gender, employee.gender) &&
                 Objects.equals(age, employee.age) &&
-                Objects.equals(salary, employee.salary);
+                Objects.equals(salary, employee.salary) &&
+                status == employee.status;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, empName, gender, age, salary);
+        return Objects.hash(id, empName, gender, age, salary, status);
     }
 
     @Override
@@ -94,6 +114,11 @@ public class Employee {
                 ", gender=" + gender +
                 ", age=" + age +
                 ", salary=" + salary +
+                ", status=" + status +
                 '}';
+    }
+
+    public enum Status {
+        FREE, BUSY, VOCATION;
     }
 }
