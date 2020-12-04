@@ -1,0 +1,256 @@
+一、变量的原子性
+    1. 模拟 CAS 算法
+        public class CompareAndSwapTest {
+
+            public static void main(String[] args) {
+                CompareAndSwap compareAndSwap = new CompareAndSwap();
+                for (int i = 0; i < 10; i++) {
+                    final int j = i;
+                    new Thread(() -> {
+                        while (!compareAndSwap.compareAndSet(compareAndSwap.getValue(), j));
+                    }).start();
+                }
+            }
+        }
+
+        class CompareAndSwap {
+            private int value = 0;
+
+            // 获取内存值
+            public synchronized int getValue() {
+                return value;
+            }
+
+            // 比较和替换
+            public synchronized int compareAndSwap(int expecte, int newValue) {
+                // 先获取内存值
+                int oldValue = this.getValue();
+
+                if (expecte == oldValue) {
+                    this.value = newValue;
+                    System.out.println(Thread.currentThread().getName() + ": " + this.value);
+                }
+
+                return oldValue;
+            }
+
+            // 是否修改成功
+            public synchronized boolean compareAndSet(int expecte, int newValue) {
+                return expecte == this.compareAndSwap(expecte, newValue);
+            }
+        }
+二、ConcurrentHashMap 锁分段机制
+    1. ConcurrentHashMap
+        ① Java 5.0 在 java.util.concurrent 包中提供了多种并发容器类来改进同步容器的性能
+        ② ConcurrentHashMap 同步容器类是 Java 5 增加的一个线程安全的哈希表。对与多线程的操作，介于 HashMap 与 Hashtable 之间。
+        内部采用“锁分段”机制替代 Hashtable 的独占锁，进而提高性能
+        ③ 此包还提供了设计用于多线程上下文的 Collection 实现：ConcurrentHashMap、ConcurrentSkipListMap、ConcurrentSkipListSet、
+        CopyOnWriteArrayList 和 CopyOnWriteArraySet。当期望许多线程访问一个给定的 collection 时，ConcurrentHashMap 通常优于同步
+        HashMap，ConcurrentSkipListMap 优于同步的 TreeMap。当期望的读数和遍历远远大于列表更新数时，CopyOnWriteArrayList优于同步的ArrayList
+    2. HashMap、ConcurrentHashMap与Hashtable之间的对比
+        ① HashMap、ConcurrentHashMap与Hashtable 底层都是 hash 表
+        ① Hashtable 是效率低线程安全的，当多个线程访问时，Hashtable 会在全局上加锁，即并行操作转换成串行操作，当一个线程完成访问后，下一个线程
+        才能开始访问，造成效率非常低，即便是考虑线程安全的问题，也不会选择Hashtable。对于复合操作（比如：若存在，则删除）可能也存在线程不安全等
+        ① HashMap 是效率高线程不安全的
+        ③ ConcurrentHashMap 介于 HashMap 与 Hashtable 之间，采用了“锁分段”机制。ConcurrentHashMap 存在一个分段级别 concurrentLevel，默认是16，
+        即把 ConcurrentHashMap 分成了16段，每一段都是一个独立的 hash 表（segment）并且持有独立的锁，而一个 hash 表 也分成了16段，每一段都是一个
+        独立的链表。当多个线程访问 ConcurrentHashMap，能够并行访问每一个 ConcurrentHashMap 段，因此ConcurrentHashMap线程安全而且效率高。Java 8
+        以后取消了 ConcurrentHashMap 的锁分段机制，改成 CAS 算法，即无锁状态。
+    3. CopyOnWriteArrayList 和 CopyOnWriteArraySet
+        ① 写入并复制
+        ② 传统的 Collections 工具类提供创建的同步集合在多线程的并发修改时会产生异常，举例：
+            public class CopyOnWriterArrayListTest {
+
+                public static void main(String[] args) {
+                    CopyOnWriterArrayThread thread = new CopyOnWriterArrayThread();
+
+                    for (int i = 0; i < 10; i++) {
+                        new Thread(thread).start();
+                    }
+                }
+            }
+
+            class CopyOnWriterArrayThread implements Runnable {
+
+                private static List<String> list = Collections.synchronizedList(new ArrayList<>());
+
+                static {
+                    list.add("AAA");
+                    list.add("BBB");
+                    list.add("CCC");
+                }
+
+                @Override
+                public void run() {
+                    Iterator<String> iterator = list.iterator();
+
+                    while (iterator.hasNext()) {
+                        System.out.println(iterator.next());
+
+                        list.add("DDDD");
+                    }
+                }
+            }
+        ③ 使用 CopyOnWriteArrayList 和 CopyOnWriteArraySet 替代同步集合，可以解决并发修改异常，在底层代码中，首先会对当前集合进行
+        复制，再把需要写入的数据添加到新的集合，最后用新的集合替代旧的集合。得出的结论是：CopyOnWriteArrayList 和 CopyOnWriteArraySet
+        不适合进行频繁更新的情况，因为每次更新时，都会进行复制，开销大，效率低，但是适合遍历或者并发遍历更新频繁的情况。
+            private static CopyOnWriteArrayList list = new CopyOnWriteArrayList<>();
+三、CountDownLatch：闭锁
+    1. CountDownLatch
+        ① Java 5.0 在 java.util.concurrent 包中提供了多种并发容器类来改进同步容器的性能
+        ② CountDownLatch 是一个同步辅助类，在完成一组正在其他线程中执行的某些操作之前，它允许一个或者多个线程一直等待
+        ③ 闭锁可以延迟线程的进度直到其达到终止状态，闭锁可以用来确保某些活动直到其他活动都完成才继续执行
+            A. 确保某个计算在其需要的所有资源都被初始化之后才继续执行
+            B. 确保某个服务在其依赖的所有其他服务都已经启动之后才启动
+            C. 等待直到某个操作所有参与者都准备就绪再继续执行
+    2. API：
+        ① CountDownLatch(int count):]：构造函数，需要指定线程的个数
+        ② await()：主线程等待分线程执行
+        ③ countDown()：每个线程执行完毕时闭锁数需要递减一，线程执行完毕之后必须执行，需要放在 finally 块中
+    3 举例：只有在所有分线程执行完毕之后再执行主线程
+        public class CountDownLatchTest {
+
+            public static void main(String[] args) {
+
+                CountDownLatch countDownLatch = new CountDownLatch(5);
+                CountDownLatchThread thread = new CountDownLatchThread(countDownLatch);
+                LocalDateTime start = LocalDateTime.now();
+
+                for (int i = 0; i < 5; i++) {
+                    new Thread(thread).start();
+                }
+
+                try {
+                    countDownLatch.await();
+                } catch (InterruptedException e) {
+                }
+                LocalDateTime end = LocalDateTime.now();
+                System.out.println("消耗的时间为：" + Duration.between(start, end).toMillis());
+            }
+        }
+
+        class CountDownLatchThread implements Runnable {
+
+            CountDownLatch countDownLatch;
+
+            public CountDownLatchThread(CountDownLatch countDownLatch) {
+                this.countDownLatch = countDownLatch;
+            }
+
+            @Override
+            public void run() {
+
+                synchronized (this) {
+                    System.out.println(Thread.currentThread().getName());
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                    } finally {
+                        countDownLatch.countDown();
+                    }
+                }
+            }
+        }
+四、创建执行线程：
+    1. 创建多线程方式一：继承与java.lang.Thread类
+        ① 创建一个继承于Thread的子类
+        ② 重写Thread类的run()方法，方法内实现此子类需要完成的功能
+        ③ 创建一个子类的对象
+        ④ 调用线程的start()方法：启动此线程；调用相应的run()方法。
+        ⑤ 一个线程只能执行一次start()方法、不能通过通过Thread类的继承继承类对象run()启动一个线程
+    2. 创建多线程方式二：实现Runnable接口：
+       	① 创建一个实现Runnable接口的类
+       	② 实现Runnable接口的抽象方法，实现某个功能
+       	③ 创建Runnable接口实现类的对象
+       	④ 将此对象作为形参传递到Thread的构造器中，创键Thread类的对象，此对象即为一个线程
+       	⑤ 调用start()方法，启动线程
+    3. 创建多线程方式三：实现
+        ① 创建一个实现 Callable 接口的类，需要指定泛型
+        ② 实现 Callable 接口的 call() 方法，返回值为指定的泛型，并且能够抛出异常
+        ③ 创建实现 Callable 接口的类的对象
+        ④ 创建一个实现了 Future 接口的类 FutureTask 的对象，将 Callable 的对象作为参数传给FutureTask，用于接收 call() 方法的返回值
+        ⑤ 创建一个 Thread 对象，将 FutureTask 的对象传到 Thread 中，并调用 Thread 对象的 start() 方法开启线程
+        ⑥ 调用 FutureTask 对象的 get() 方法可以获取 Callable 对象的call() 方法 的返回值，需要抛出异常
+        ⑦ 注意：FutureTask 可用于闭锁
+        ⑧ 举例：
+            public class CallableTest {
+
+                public static void main(String[] args) {
+                    CallableThread callable = new CallableThread();
+
+                    FutureTask task = new FutureTask(callable);
+
+                    new Thread(task).start();
+
+                    try {
+                        Object result = task.get();
+                        System.out.println(result);
+                        System.out.println("结果执行完毕");
+                    } catch (InterruptedException | ExecutionException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+
+            class CallableThread implements Callable<Long> {
+
+                @Override
+                public Long call() throws Exception {
+                    long sum = 0;
+                    for (int i = 0; i <= 100; i++) {
+                        System.out.println(i);
+                        sum += i;
+                    }
+                    return sum;
+                }
+            }
+    4. java.lang.Thread、Runnable 接口和 Callable 接口区别与联系
+       	① 联系：继承 Thread 类、实现 Runnable 接口或者用于接收实现了 Callable 的抽象方法 call() 方法返回值的 FutureTask的类
+       	直接或者间接地实现了Runable接口
+       	② 区别：实现Runnable接口实现多线程的方式多于继承Thread类的方式
+            A. 避免了java中单继承的局限性
+            B. 解决了多个线程公用同一个资源的问题
+        ③ Callable 接口的抽象方法有返回值，并且用于接收 Callable 对象的 call() 方法返回值的 FutureTask 可用于 闭锁
+五、同步锁Lock
+    1. 用于解决多线程安全问题的方式
+        ① 同步代码块（）
+        ② 同步方法（synchronized）
+        ③ 同步锁 Lock（JDK1.5 以后）
+        ④ 注：同步代码块和同步方法都需要使用到 synchronized 关键字，是一个隐式锁，而同步锁是一个显式锁
+    2. API：
+        ① lock()：给当前线程加锁
+        ② unlock()：给当前线程解锁
+    3. 举例：买票
+        public class LockTest {
+
+            public static void main(String[] args) {
+                SellTicket sellTicket = new SellTicket();
+                new Thread(sellTicket, "一号窗口").start();
+                new Thread(sellTicket, "二号窗口").start();
+                new Thread(sellTicket, "三号窗口").start();
+            }
+        }
+
+        class SellTicket implements Runnable {
+
+            private int ticketNum = 100;
+
+            private Lock lock = new ReentrantLock();
+            @Override
+            public void run() {
+                while (ticketNum > 0) {
+                    lock.lock();
+                    try {
+                        System.out.println(Thread.currentThread().getName() + "完成售票，余票为：" + --ticketNum);
+                    } finally {
+                        lock.unlock();
+                        try {
+                            Thread.sleep(200);
+                        } catch (InterruptedException e) {
+                        }
+                    }
+                }
+            }
+        }
+
+
