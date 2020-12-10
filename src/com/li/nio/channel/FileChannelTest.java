@@ -2,16 +2,146 @@ package com.li.nio.channel;
 
 import org.junit.Test;
 
-import java.io.*;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CharsetEncoder;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 public class FileChannelTest {
+
+    @Test
+    public void testCharset() {
+
+        // 获取字符集
+        Charset charset = Charset.forName("UTF-8");
+        // 获取编码器
+        CharsetEncoder ce = charset.newEncoder();
+        // 获取解码器
+        CharsetDecoder cd = charset.newDecoder();
+
+        // 获取字符缓冲区，并写入数据
+        CharBuffer buffer = CharBuffer.allocate(100);
+        buffer.put("李晓亮");
+        buffer.flip();
+
+        // 编码
+        try {
+            ByteBuffer byteBuffer = ce.encode(buffer);
+            for (int i = 0; i < byteBuffer.limit(); i++) {
+                System.out.println(byteBuffer.get());
+            }
+
+            // 切换读取数据模式
+            byteBuffer.flip();
+
+            // 解码
+            CharBuffer charBuffer = cd.decode(byteBuffer);
+            System.out.println(charBuffer.toString());
+        } catch (CharacterCodingException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Test
+    public void testCharsetMap() {
+        Map<String, Charset> map = Charset.availableCharsets();
+        for (Map.Entry<String, Charset> entry : map.entrySet()) {
+            System.out.println(entry.getKey() + "=" + entry.getValue());
+        }
+    }
+
+    @Test
+    public void testRandomAccessFile() {
+        // 利用分散读取，聚集写入完成文件的复制
+
+        RandomAccessFile raf1 = null;
+        RandomAccessFile raf2 = null;
+        FileChannel inChannel = null;
+        FileChannel outChannel = null;
+        try {
+            LocalDateTime start = LocalDateTime.now();
+
+            // 获取文件随机存储流
+            raf1 = new RandomAccessFile("1.sql", "rw");
+            raf2 = new RandomAccessFile("2.sql", "rw");
+
+            // 获取对应的通道
+            inChannel = raf1.getChannel();
+            outChannel = raf2.getChannel();
+
+            // 获取非直接缓冲区
+            ByteBuffer buffer1 = ByteBuffer.allocate(100);
+            ByteBuffer buffer2 = ByteBuffer.allocate(1024);
+
+            // 分散读取
+            ByteBuffer[] buffers = new ByteBuffer[] {buffer1, buffer2};
+
+            while ((inChannel.read(buffers)) != -1) {
+                // 切换读取数据模式
+                for (ByteBuffer buffer : buffers) {
+                    buffer.flip();
+                }
+
+                // 聚集写入
+                outChannel.write(buffers);
+
+                // 清空缓冲区
+                for (ByteBuffer buffer : buffers) {
+                    buffer.clear();
+                }
+            }
+
+            LocalDateTime end = LocalDateTime.now();
+            System.out.println("消耗的时间为：" + Duration.between(start, end).toMillis()); // 1721
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            if (outChannel != null) {
+                try {
+                    outChannel.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            if (inChannel != null) {
+                try {
+                    inChannel.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            if (raf2 != null) {
+                try {
+                    raf2.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            if (raf1 != null) {
+                try {
+                    raf1.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
 
     @Test
     public void testTransfer() {
@@ -28,6 +158,7 @@ public class FileChannelTest {
 
             // inFileChannel.transferTo(0, inFileChannel.size(), outFileChannel);
             outFileChannel.transferFrom(inFileChannel, 0, inFileChannel.size());
+
             LocalDateTime end = LocalDateTime.now();
             System.out.println("消耗的时间为：" + Duration.between(start, end).toMillis()); // 183 184
         } catch (IOException e) {
